@@ -3,16 +3,21 @@ data "http" "workstation-external-ip" {
 }
 
 locals {
-  workstation-external-cidr = "${chomp(data.http.workstation-external-ip.body)}/32"
+  workstation-external-cidr = "${chomp(data.http.workstation-external-ip.response_body)}/32"
 }
 
-data "aws_subnet_ids" "subnet_id" {
-  vpc_id = var.vpc_id
+data "aws_subnets" "subnet_id" {
+  filter {
+    name   = "vpc-id"
+    values = [var.vpc_id]
+  }
 
-  tags = {
-    Name = "pub*"
+  filter {
+    name   = "tag:Name"
+    values = ["pub*"]
   }
 }
+
 
 
 output "ids" {
@@ -81,7 +86,7 @@ resource "aws_eks_cluster" "myeks" {
     version = "1.24"
     vpc_config {
         
-        subnet_ids = data.aws_subnet_ids.subnet_id.ids
+        subnet_ids = data.aws_subnets.subnet_id.ids
         endpoint_private_access = false
         endpoint_public_access = true
         security_group_ids = [aws_security_group.EKS_SG.id]
