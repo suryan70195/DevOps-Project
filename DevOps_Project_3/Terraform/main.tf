@@ -1,3 +1,4 @@
+# Get the external IP address of the workstation
 data "http" "workstation-external-ip" {
   url = "http://ipv4.icanhazip.com"
 }
@@ -6,6 +7,7 @@ locals {
   workstation-external-cidr = "${chomp(data.http.workstation-external-ip.response_body)}/32"
 }
 
+# Fetch public subnets in the VPC
 data "aws_subnets" "subnet_id" {
   filter {
     name   = "vpc-id"
@@ -18,37 +20,30 @@ data "aws_subnets" "subnet_id" {
   }
 }
 
-
-
+# Output subnet IDs
 output "ids" {
   value = data.aws_subnets.subnet_id.ids
 }
 
-
-
-
+# Create Security Group for EKS
 resource "aws_security_group" "EKS_SG" {
   name        = "${var.cluster_name}-sg"
-  description = "${var.cluster_name}-sg"
+  description = "Security group for EKS cluster"
   vpc_id      = var.vpc_id
-  
 
   ingress {
-    description      = "TLS from VPC"
-    from_port        = 0
-    to_port          = 0
-    protocol         = "-1"
-    cidr_blocks      = [local.workstation-external-cidr]
-    
+    description = "TLS from VPC"
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = [local.workstation-external-cidr]
   }
 
-
   egress {
-    from_port        = 0
-    to_port          = 0
-    protocol         = "-1"
-    cidr_blocks      = ["0.0.0.0/0"]
-    
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
   }
 
   tags = {
@@ -56,7 +51,7 @@ resource "aws_security_group" "EKS_SG" {
   }
 }
 
-
+# IAM Role for EKS Cluster
 resource "aws_iam_role" "cluster_role" {
   name = "${var.cluster_name}-eks-cluster-cluster_role"
 
@@ -76,30 +71,29 @@ resource "aws_iam_role" "cluster_role" {
 POLICY
 }
 
+# Attach EKS Cluster Policy
 resource "aws_iam_role_policy_attachment" "AmazonEKSClusterPolicy" {
   policy_arn = "arn:aws:iam::aws:policy/AmazonEKSClusterPolicy"
   role       = aws_iam_role.cluster_role.name
 }
 
+# Create EKS Cluster
 resource "aws_eks_cluster" "myeks" {
-    name = var.cluster_name
-    role_arn = aws_iam_role.cluster_role.arn
-    version = "1.27"
-    vpc_config {
-        
-        subnet_ids = data.aws_subnets.subnet_id.ids
-        endpoint_private_access = false
-        endpoint_public_access = true
-        security_group_ids = [aws_security_group.EKS_SG.id]
-    
-    }
+  name     = var.cluster_name
+  role_arn = aws_iam_role.cluster_role.arn
+  version  = "1.27"  # Ensure compatibility with latest AMI
 
+  vpc_config {
+    subnet_ids              = data.aws_subnets.subnet_id.ids
+    endpoint_private_access = false
+    endpoint_public_access  = true
+    security_group_ids      = [aws_security_group.EKS_SG.id]
+  }
 }
 
-#
-
+# IAM Role for EKS Node Group
 resource "aws_iam_role" "eks_node_role" {
-  name = "${var.cluster_name}-terraform-eks-eks_node_role"
+  name = "${var.cluster_name}-eks-node-role"
 
   assume_role_policy = <<POLICY
 {
@@ -117,6 +111,7 @@ resource "aws_iam_role" "eks_node_role" {
 POLICY
 }
 
+# Attach Required Policies for EKS Worker Nodes
 resource "aws_iam_role_policy_attachment" "eks_node_role-AmazonEKSWorkerNodePolicy" {
   policy_arn = "arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy"
   role       = aws_iam_role.eks_node_role.name
@@ -132,20 +127,40 @@ resource "aws_iam_role_policy_attachment" "eks_node_role-AmazonEC2ContainerRegis
   role       = aws_iam_role.eks_node_role.name
 }
 
+# Create Launch Template for EKS Node Group with the correct AMI
+resource "aws_launch_template" "eks_lt" {
+  name          = "eks-launch-template"
+  image_id      = "ami-0ec98c2db7d0a924c"  # Latest Amazon Linux 2 AMI for EKS 1.27
+  instance_type = var.node_instance_type
 
-
-resource "aws_eks_node_group" "mynode_node" {
-    cluster_name = aws_eks_cluster.myeks.name
-    node_group_name = "${var.cluster_name}-node"
-    node_role_arn = aws_iam_role.eks_node_role.arn
-    subnet_ids = data.aws_subnets.subnet_id.ids
-
-
-    scaling_config {
-        desired_size = 1
-        max_size = 1
-        min_size = 1
+  tag_specifications {
+    resource_type = "instance"
+    tags = {
+      Name = "eks-node"
     }
-
-    instance_types = [var.node_instance_type]
+  }
 }
+
+# Create EKS Node Group
+resource "aws_eks_node_group" "mynode_node" {
+  cluster_name    = aws_eks_cluster.myeks.name
+  node_group_name = "${var.cluster_name}-node"
+  node_role_arn   = aws_iam_role.eks_node_role.arn
+  subnet_ids      = data.aws_subnets.subnet_id.ids
+  instance_types  = [var.node_instance_type]
+
+  ami_type = "AL2_x86_64"  # Amazon Linux 2 for x86_64 architecture
+
+  scaling_config {
+    desired_size = 1
+    max_size     = 1
+    min_size     = 1
+  }
+
+  # Attach Launch Template with correct AMI
+  launch_template {
+    id      = aws_launch_template.eks_lt.id
+    version = "latest"
+  }
+}
+
