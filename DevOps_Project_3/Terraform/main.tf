@@ -21,8 +21,9 @@ data "aws_subnets" "subnet_id" {
 
 
 output "ids" {
-    value = data.aws_subnet_ids.subnet_id.ids
+  value = data.aws_subnets.subnet_id.ids
 }
+
 
 
 
@@ -137,7 +138,8 @@ resource "aws_eks_node_group" "mynode_node" {
     cluster_name = aws_eks_cluster.myeks.name
     node_group_name = "${var.cluster_name}-node"
     node_role_arn = aws_iam_role.eks_node_role.arn
-    subnet_ids = data.aws_subnet_ids.subnet_id.ids
+    subnet_ids = data.aws_subnets.subnet_id.ids
+
 
     scaling_config {
         desired_size = 1
