@@ -32,7 +32,11 @@ helm repo add eks https://aws.github.io/eks-charts
 helm upgrade --install nginx bitnami/nginx
 
 #installing aws loadbalancer controller
-helm upgrade --install lb-controller eks/aws-load-balancer-controller --set clusterName=$CLUSTER_NAME
+if ! helm list -q | grep -q "^lb-controller$"; then
+    helm upgrade --install lb-controller eks/aws-load-balancer-controller --set clusterName="$CLUSTER_NAME"
+  else
+    echo "AWS Load Balancer Controller is already installed"
+  fi
 
 
 else
