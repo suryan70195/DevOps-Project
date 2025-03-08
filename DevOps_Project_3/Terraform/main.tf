@@ -1,9 +1,4 @@
 # Get the external IP address of the workstation
-variable "workstation_external_ip" {
-  description = "External IP address of the workstation"
-  default     = ""
-}
-
 data "http" "workstation-external-ip" {
   url = "http://ipv4.icanhazip.com"
 }
