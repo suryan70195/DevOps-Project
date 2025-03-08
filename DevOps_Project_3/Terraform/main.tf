@@ -1,11 +1,17 @@
 # Get the external IP address of the workstation
+variable "workstation_external_ip" {
+  description = "External IP address of the workstation"
+  default     = ""
+}
+
 data "http" "workstation-external-ip" {
   url = "http://ipv4.icanhazip.com"
 }
 
 locals {
-  workstation-external-cidr = "${chomp(data.http.workstation-external-ip.response_body)}/32"
+  workstation-external-cidr = coalesce("${chomp(data.http.workstation-external-ip.response_body)}/32", "${var.workstation_external_ip}/32")
 }
+
 
 # Fetch public subnets in the VPC
 data "aws_subnets" "subnet_id" {
@@ -78,10 +84,16 @@ resource "aws_iam_role_policy_attachment" "AmazonEKSClusterPolicy" {
 }
 
 # Create EKS Cluster
+variable "eks_version" {
+  default = "1.27"
+}
+
 resource "aws_eks_cluster" "myeks" {
   name     = var.cluster_name
   role_arn = aws_iam_role.cluster_role.arn
-  version  = "1.26"  # Ensure compatibility with latest AMI
+  version  = var.eks_version
+}
+
 
   vpc_config {
     subnet_ids              = data.aws_subnets.subnet_id.ids
@@ -128,9 +140,13 @@ resource "aws_iam_role_policy_attachment" "eks_node_role-AmazonEC2ContainerRegis
 }
 
 # Create Launch Template for EKS Node Group with the correct AMI
+data "aws_ssm_parameter" "eks_ami" {
+  name = "/aws/service/eks/optimized-ami/1.27/amazon-linux-2/recommended/image_id"
+}
+
 resource "aws_launch_template" "eks_lt" {
   name          = "eks-launch-template"
-  image_id      = "ami-0ec98c2db7d0a924c"  # Latest Amazon Linux 2 AMI for EKS 1.27
+  image_id      = data.aws_ssm_parameter.eks_ami.value  # Fetches the latest Amazon Linux 2 AMI
   instance_type = var.node_instance_type
 
   tag_specifications {
@@ -140,6 +156,7 @@ resource "aws_launch_template" "eks_lt" {
     }
   }
 }
+
 
 # Create EKS Node Group
 resource "aws_eks_node_group" "mynode_node" {
