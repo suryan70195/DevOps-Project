@@ -90,7 +90,7 @@ variable "eks_version" {
 
 resource "aws_eks_cluster" "myeks" {
   name     = var.cluster_name
-  role_arn = aws_iam_role.cluster_role.arn
+  role_arn = "arn:aws:iam::954976297955:role/EKS-Cluster-Role"
   version  = "1.27"
 
   vpc_config {  # This should be inside aws_eks_cluster
