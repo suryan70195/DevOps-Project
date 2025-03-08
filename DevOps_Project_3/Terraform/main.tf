@@ -91,17 +91,16 @@ variable "eks_version" {
 resource "aws_eks_cluster" "myeks" {
   name     = var.cluster_name
   role_arn = aws_iam_role.cluster_role.arn
-  version  = var.eks_version
-}
+  version  = "1.27"
 
-
-  vpc_config {
+  vpc_config {  # This should be inside aws_eks_cluster
     subnet_ids              = data.aws_subnets.subnet_id.ids
     endpoint_private_access = false
     endpoint_public_access  = true
     security_group_ids      = [aws_security_group.EKS_SG.id]
   }
 }
+
 
 # IAM Role for EKS Node Group
 resource "aws_iam_role" "eks_node_role" {
