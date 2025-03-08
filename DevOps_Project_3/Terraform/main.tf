@@ -140,10 +140,8 @@ data "aws_ssm_parameter" "eks_ami" {
 }
 
 resource "aws_launch_template" "eks_lt" {
-  name          = "eks-launch-template"
-  image_id      = coalesce(data.aws_ssm_parameter.eks_ami.value, var.eks_ami_id) # Use default if SSM fails
+  name          = "eks-launch-template-${var.cluster_name}"
   instance_type = var.node_instance_type
-
 
   tag_specifications {
     resource_type = "instance"
@@ -152,7 +150,6 @@ resource "aws_launch_template" "eks_lt" {
     }
   }
 }
-
 
 # Create EKS Node Group
 resource "aws_eks_node_group" "mynode_node" {
