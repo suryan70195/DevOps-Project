@@ -171,9 +171,9 @@ resource "aws_eks_node_group" "mynode_node" {
   }
 
   # Attach Launch Template with correct AMI
-  launch_template {
-    id      = aws_launch_template.eks_lt.id
-    version = "latest"
-  }
+launch_template {
+  id      = aws_launch_template.eks_lt.id
+  version = "$Latest"
+ }
 }
 
