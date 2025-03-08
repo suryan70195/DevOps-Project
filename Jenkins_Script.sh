@@ -5,7 +5,7 @@ export TF_VAR_region=$REGION
 export TF_VAR_vpc_id=$VPC_ID
 export TF_VAR_cluster_name=$CLUSTER_NAME
 
-cd ${WORKSPACE}/DevOps_Project_3/Terraform
+cd ${WORKSPACE}/DevOps_Project/Terraform
 
 terraform init
 terraform apply --auto-approve
