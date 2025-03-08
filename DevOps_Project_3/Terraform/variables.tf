@@ -3,10 +3,11 @@ variable "region" {
   default     = ""
 }
 
-variable "vpc_id" {
-  description = "ID of the VPC where EKS will be deployed"
-  default     = ""
+variable "workstation_external_ip" {
+  type    = string
+  default = "0.0.0.0/0"
 }
+
 
 variable "cluster_name" {
   description = "Name of the EKS cluster"
