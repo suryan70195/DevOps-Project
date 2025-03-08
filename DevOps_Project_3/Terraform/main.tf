@@ -6,6 +6,7 @@ locals {
   workstation-external-cidr = "${chomp(data.http.workstation-external-ip.response_body)}/32"
 }
 
+# Fetching available subnets in the VPC
 data "aws_subnets" "selected" {
   filter {
     name   = "vpc-id"
@@ -22,6 +23,7 @@ output "subnet_ids" {
   value = data.aws_subnets.selected.ids
 }
 
+# Security Group for EKS Cluster
 resource "aws_security_group" "EKS_SG" {
   name        = "${var.cluster_name}-sg"
   description = "${var.cluster_name}-sg"
@@ -47,6 +49,32 @@ resource "aws_security_group" "EKS_SG" {
   }
 }
 
+# IAM Role for EKS Cluster
+resource "aws_iam_role" "cluster_role" {
+  name = "${var.cluster_name}-eks-cluster-cluster_role"
+
+  assume_role_policy = <<POLICY
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "Service": "eks.amazonaws.com"
+      },
+      "Action": "sts:AssumeRole"
+    }
+  ]
+}
+POLICY
+}
+
+resource "aws_iam_role_policy_attachment" "AmazonEKSClusterPolicy" {
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEKSClusterPolicy"
+  role       = aws_iam_role.cluster_role.name
+}
+
+# EKS Cluster Definition
 resource "aws_eks_cluster" "myeks" {
   name     = var.cluster_name
   role_arn = aws_iam_role.cluster_role.arn
@@ -59,6 +87,8 @@ resource "aws_eks_cluster" "myeks" {
     security_group_ids      = [aws_security_group.EKS_SG.id]
   }
 }
+
+# IAM Role for EKS Node Group
 resource "aws_iam_role" "eks_node_role" {
   name = "${var.cluster_name}-terraform-eks-eks_node_role"
 
@@ -93,8 +123,7 @@ resource "aws_iam_role_policy_attachment" "eks_node_role-AmazonEC2ContainerRegis
   role       = aws_iam_role.eks_node_role.name
 }
 
-
-
+# EKS Node Group
 resource "aws_eks_node_group" "mynode_node" {
   cluster_name    = aws_eks_cluster.myeks.name
   node_group_name = "${var.cluster_name}-node"
@@ -115,4 +144,3 @@ resource "aws_eks_node_group" "mynode_node" {
 
   instance_types = [var.node_instance_type]
 }
-
