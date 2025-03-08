@@ -1,17 +1,11 @@
 variable "region" {
   description = "AWS region where resources will be deployed"
-  default     = ""
+  default     = "us-east-1"
 }
 
 variable "vpc_id" {
   description = "VPC ID for the EKS cluster"
   type        = string
-}
-
-
-variable "workstation_external_ip" {
-  type    = string
-  default = "0.0.0.0"
 }
 
 variable "eks_version" {
@@ -25,14 +19,8 @@ variable "cluster_name" {
   default     = "my-eks-cluster"
 }
 
-
 variable "node_instance_type" {
   description = "EC2 instance type for EKS worker nodes"
   default     = "c5.xlarge"
-}
-
-variable "eks_ami_id" {
-  description = "Amazon Linux 2 AMI for EKS nodes"
-  default     = "ami-0ec98c2db7d0a924c"
 }
 

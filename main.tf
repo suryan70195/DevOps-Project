@@ -1,16 +1,11 @@
-# Get the external IP address of the workstation
+# Get external IP address of the workstation
 data "http" "workstation-external-ip" {
   url = "http://ipv4.icanhazip.com"
 }
 
 locals {
-  workstation-external-cidr = coalesce(
-    "${chomp(data.http.workstation-external-ip.response_body)}/32",
-    "${var.workstation_external_ip}/32"
-  )
+  workstation-external-cidr = "${chomp(data.http.workstation-external-ip.response_body)}/32"
 }
-
-
 
 # Fetch public subnets in the VPC
 data "aws_subnets" "subnet_id" {
@@ -37,7 +32,7 @@ resource "aws_security_group" "EKS_SG" {
   vpc_id      = var.vpc_id
 
   ingress {
-    description = "TLS from VPC"
+    description = "Access from Workstation"
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
@@ -58,7 +53,7 @@ resource "aws_security_group" "EKS_SG" {
 
 # IAM Role for EKS Cluster
 resource "aws_iam_role" "cluster_role" {
-  name = "${var.cluster_name}-eks-cluster-cluster_role"
+  name = "${var.cluster_name}-eks-cluster-role"
 
   assume_role_policy = <<POLICY
 {
@@ -83,20 +78,18 @@ resource "aws_iam_role_policy_attachment" "AmazonEKSClusterPolicy" {
 }
 
 # Create EKS Cluster
-
 resource "aws_eks_cluster" "myeks" {
   name     = var.cluster_name
-  role_arn = "arn:aws:iam::954976297955:role/EKS-Cluster-Role"
+  role_arn = aws_iam_role.cluster_role.arn
   version  = var.eks_version
 
-  vpc_config { # This should be inside aws_eks_cluster
+  vpc_config {
     subnet_ids              = data.aws_subnets.subnet_id.ids
     endpoint_private_access = false
     endpoint_public_access  = true
     security_group_ids      = [aws_security_group.EKS_SG.id]
   }
 }
-
 
 # IAM Role for EKS Node Group
 resource "aws_iam_role" "eks_node_role" {
@@ -124,24 +117,21 @@ resource "aws_iam_role_policy_attachment" "eks_node_role-AmazonEKSWorkerNodePoli
   role       = aws_iam_role.eks_node_role.name
 }
 
-resource "aws_iam_role_policy_attachment" "eks_node_role-AmazonEKS_CNI_Policy" {
-  policy_arn = "arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy"
-  role       = aws_iam_role.eks_node_role.name
-}
-
 resource "aws_iam_role_policy_attachment" "eks_node_role-AmazonEC2ContainerRegistryReadOnly" {
   policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
   role       = aws_iam_role.eks_node_role.name
 }
 
-# Create Launch Template for EKS Node Group with the correct AMI
+# Fetch latest EKS Amazon Linux 2 AMI from SSM Parameter Store
 data "aws_ssm_parameter" "eks_ami" {
-  name = "/aws/service/eks/optimized-ami/1.27/amazon-linux-2/recommended/image_id"
+  name = "/aws/service/eks/optimized-ami/${var.eks_version}/amazon-linux-2/recommended/image_id"
 }
 
+# Create Launch Template for EKS Node Group
 resource "aws_launch_template" "eks_lt" {
   name          = "eks-launch-template-${var.cluster_name}"
   instance_type = var.node_instance_type
+  image_id      = data.aws_ssm_parameter.eks_ami.value  # Use latest EKS AMI
 
   tag_specifications {
     resource_type = "instance"
@@ -159,18 +149,15 @@ resource "aws_eks_node_group" "mynode_node" {
   subnet_ids      = data.aws_subnets.subnet_id.ids
   instance_types  = [var.node_instance_type]
 
-  ami_type = "AL2_x86_64" # Amazon Linux 2 for x86_64 architecture
-
   scaling_config {
     desired_size = 1
     max_size     = 1
     min_size     = 1
   }
 
-  # Attach Launch Template with correct AMI
-launch_template {
-  id      = aws_launch_template.eks_lt.id
-  version = "$Latest"
- }
+  launch_template {
+    id      = aws_launch_template.eks_lt.id
+    version = "Latest"
+  }
 }
 
