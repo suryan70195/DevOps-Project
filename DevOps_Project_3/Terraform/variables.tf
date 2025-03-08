@@ -14,7 +14,5 @@ variable "cluster_name" {
 }
 
 variable "node_instance_type" {
-  description = "Instance type for EKS worker nodes"
-  type        = string
-  default     = "c5.xlarge"
+  default = "t3.medium"  # Ensure it's a compatible instance
 }
