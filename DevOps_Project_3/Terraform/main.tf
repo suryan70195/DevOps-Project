@@ -4,8 +4,12 @@ data "http" "workstation-external-ip" {
 }
 
 locals {
-  workstation-external-cidr = coalesce("${chomp(data.http.workstation-external-ip.response_body)}/32", "${var.workstation_external_ip}/32")
+  workstation-external-cidr = coalesce(
+    "${chomp(data.http.workstation-external-ip.response_body)}/32",
+    "${var.workstation_external_ip}/32"
+  )
 }
+
 
 
 # Fetch public subnets in the VPC
@@ -79,16 +83,13 @@ resource "aws_iam_role_policy_attachment" "AmazonEKSClusterPolicy" {
 }
 
 # Create EKS Cluster
-variable "eks_version" {
-  default = "1.27"
-}
 
 resource "aws_eks_cluster" "myeks" {
   name     = var.cluster_name
   role_arn = "arn:aws:iam::954976297955:role/EKS-Cluster-Role"
-  version  = "1.27"
+  version  = var.eks_version
 
-  vpc_config {  # This should be inside aws_eks_cluster
+  vpc_config { # This should be inside aws_eks_cluster
     subnet_ids              = data.aws_subnets.subnet_id.ids
     endpoint_private_access = false
     endpoint_public_access  = true
@@ -140,8 +141,9 @@ data "aws_ssm_parameter" "eks_ami" {
 
 resource "aws_launch_template" "eks_lt" {
   name          = "eks-launch-template"
-  image_id      = data.aws_ssm_parameter.eks_ami.value  # Fetches the latest Amazon Linux 2 AMI
+  image_id      = coalesce(data.aws_ssm_parameter.eks_ami.value, var.eks_ami_id) # Use default if SSM fails
   instance_type = var.node_instance_type
+
 
   tag_specifications {
     resource_type = "instance"
@@ -160,7 +162,7 @@ resource "aws_eks_node_group" "mynode_node" {
   subnet_ids      = data.aws_subnets.subnet_id.ids
   instance_types  = [var.node_instance_type]
 
-  ami_type = "AL2_x86_64"  # Amazon Linux 2 for x86_64 architecture
+  ami_type = "AL2_x86_64" # Amazon Linux 2 for x86_64 architecture
 
   scaling_config {
     desired_size = 1
