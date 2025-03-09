@@ -6,7 +6,7 @@ export TF_VAR_region=${REGION:-"us-east-1"}
 export TF_VAR_vpc_id=${VPC_ID:-""}  # Ensure VPC_ID is set
 export TF_VAR_cluster_name=${CLUSTER_NAME:-"eks-cluster-bhuvan"}
 
-if [[ -z "$TF_VAR_vpc_id" ]]; then
+if [[ -z "$VPC_ID" ]]; then
     echo "ERROR: VPC_ID is not set! Please provide a valid VPC ID."
     exit 1
 fi
@@ -29,7 +29,7 @@ if ! grep -q "$CLUSTER_NAME" backend.tf; then
 fi
 
 if [[ "$ACTION" != "apply" && "$ACTION" != "destroy" ]]; then
-    echo "❌ ERROR: Invalid Terraform action! Use 'apply' or 'destroy'."
+    echo "ERROR: Invalid Terraform action! Use 'apply' or 'destroy'."
     exit 1
 fi
 
