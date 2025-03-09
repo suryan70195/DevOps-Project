@@ -8,6 +8,7 @@ locals {
 
 # Fetching available subnets in the VPC
 data "aws_subnets" "selected" {
+count = length(var.vpc_id) > 0 ? 1 : 0
   filter {
     name   = "vpc-id"
     values = [var.vpc_id]
@@ -20,13 +21,13 @@ data "aws_subnets" "selected" {
 }
 
 output "subnet_ids" {
-  value = data.aws_subnets.selected.ids
+  value = length(data.aws_subnets.selected.ids) > 0 ? data.aws_subnets.selected.ids : ["No subnets found!"]
 }
 
 # Security Group for EKS Cluster
 resource "aws_security_group" "EKS_SG" {
   name        = "${var.cluster_name}-sg"
-  description = "${var.cluster_name}-sg"
+  description = "Security group for ${var.cluster_name} EKS cluster"
   vpc_id      = var.vpc_id
 
   ingress {
@@ -38,6 +39,7 @@ resource "aws_security_group" "EKS_SG" {
   }
 
   egress {
+    description      = "Allow all outbound traffic"
     from_port        = 0
     to_port          = 0
     protocol         = "-1"
@@ -126,15 +128,9 @@ resource "aws_iam_role_policy_attachment" "eks_node_role-AmazonEC2ContainerRegis
 # EKS Node Group
 resource "aws_eks_node_group" "mynode_node" {
   cluster_name    = aws_eks_cluster.myeks.name
-  node_group_name = "${var.cluster_name}-node"
+  node_group_name = "${var.cluster_name}-node-group"
   node_role_arn   = aws_iam_role.eks_node_role.arn
-  subnet_ids = [
-    "subnet-0f5bb343af9cdd447", # us-east-1b
-    "subnet-068a6fd375f265e2d", # us-east-1a
-    "subnet-003edcdbf20b75d6b", # us-east-1f
-    "subnet-0869ccf0b089dd509", # us-east-1d
-    "subnet-082800bf7e3e0c211"  # us-east-1c
-  ]
+  subnet_ids      = length(data.aws_subnets.selected.ids) > 0 ? data.aws_subnets.selected.ids : []
 
   scaling_config {
     desired_size = 1
