@@ -2,8 +2,8 @@
 
 terraform {
   backend "s3" {
-    bucket = "bhuvan-terraform-statefile"
-    key = "eks/scr_cluster_name/statefile"
+    bucket = "s3buckethelm-terraform-statefile"
+    key = "eks/bhuvan_cluster_name/statefile"
     region = "us-east-1"
   }
 } 
