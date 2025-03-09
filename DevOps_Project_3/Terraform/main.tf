@@ -8,8 +8,7 @@ locals {
 
 # Fetch available subnets dynamically from the VPC
 data "aws_subnets" "selected" {
-  count = length(var.vpc_id) > 0 ? 1 : 0  # Ensure VPC_ID is set before fetching subnets
-
+ 
   filter {
     name   = "vpc-id"
     values = [var.vpc_id]
@@ -79,7 +78,7 @@ resource "aws_eks_cluster" "myeks" {
   version  = "1.27"
 
   vpc_config {
-    subnet_ids              = length(data.aws_subnets.selected.ids) > 0 ? data.aws_subnets.selected.ids : []
+    subnet_ids              = length(data.aws_subnets.selected.ids) > 0 ? data.aws_subnets.selected[0].ids : []
     endpoint_private_access = false
     endpoint_public_access  = true
     security_group_ids      = [aws_security_group.EKS_SG.id]
@@ -126,11 +125,11 @@ resource "aws_eks_node_group" "mynode_node" {
   cluster_name    = aws_eks_cluster.myeks.name
   node_group_name = "${var.cluster_name}-node-group"
   node_role_arn   = aws_iam_role.eks_node_role.arn
-  subnet_ids      = length(data.aws_subnets.selected.ids) > 0 ? data.aws_subnets.selected.ids : []
+  subnet_ids      = length(data.aws_subnets.selected.ids) > 0 ? data.aws_subnets.selected[0].ids : []
 
   scaling_config {
     desired_size = 1
-    max_size     = 2
+    max_size     = 1
     min_size     = 1
   }
 
