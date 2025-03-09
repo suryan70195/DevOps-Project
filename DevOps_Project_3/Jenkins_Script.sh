@@ -10,7 +10,7 @@ export TF_VAR_cluster_name=$CLUSTER_NAME
 cd ${WORKSPACE}/DevOps_Project_3/Terraform
 
 # Replace `scr_cluster_name` with the actual cluster name
-sed -i "s/scr_cluster_name/$CLUSTER_NAME/g" backend.tf
+sed -i "s/bhuvan_cluster_name/$CLUSTER_NAME/g" backend.tf
 
 # Verify Backend Update
 cat backend.tf | grep "$CLUSTER_NAME" || { echo "Error: backend.tf not updated!"; exit 1; }
