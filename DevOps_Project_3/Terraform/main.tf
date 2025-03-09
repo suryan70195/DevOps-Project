@@ -6,17 +6,13 @@ locals {
   workstation-external-cidr = "${chomp(data.http.workstation-external-ip.response_body)}/32"
 }
 
-# Fetching available subnets in the VPC
+# Fetch available subnets dynamically from the VPC
 data "aws_subnets" "selected" {
-count = length(var.vpc_id) > 0 ? 1 : 0
+  count = length(var.vpc_id) > 0 ? 1 : 0  # Ensure VPC_ID is set before fetching subnets
+
   filter {
     name   = "vpc-id"
     values = [var.vpc_id]
-  }
-
-  filter {
-    name   = "availability-zone"
-    values = ["us-east-1a", "us-east-1b", "us-east-1c", "us-east-1d", "us-east-1f"]
   }
 }
 
@@ -31,7 +27,7 @@ resource "aws_security_group" "EKS_SG" {
   vpc_id      = var.vpc_id
 
   ingress {
-    description      = "TLS from VPC"
+    description      = "Allow inbound traffic from workstation"
     from_port        = 0
     to_port          = 0
     protocol         = "-1"
@@ -83,7 +79,7 @@ resource "aws_eks_cluster" "myeks" {
   version  = "1.27"
 
   vpc_config {
-    subnet_ids              = data.aws_subnets.selected.ids
+    subnet_ids              = length(data.aws_subnets.selected.ids) > 0 ? data.aws_subnets.selected.ids : []
     endpoint_private_access = false
     endpoint_public_access  = true
     security_group_ids      = [aws_security_group.EKS_SG.id]
@@ -92,7 +88,7 @@ resource "aws_eks_cluster" "myeks" {
 
 # IAM Role for EKS Node Group
 resource "aws_iam_role" "eks_node_role" {
-  name = "${var.cluster_name}-terraform-eks-eks_node_role"
+  name = "${var.cluster_name}-eks-node-role"
 
   assume_role_policy = <<POLICY
 {
@@ -125,7 +121,7 @@ resource "aws_iam_role_policy_attachment" "eks_node_role-AmazonEC2ContainerRegis
   role       = aws_iam_role.eks_node_role.name
 }
 
-# EKS Node Group
+# EKS Node Group (Uses dynamically fetched subnet IDs)
 resource "aws_eks_node_group" "mynode_node" {
   cluster_name    = aws_eks_cluster.myeks.name
   node_group_name = "${var.cluster_name}-node-group"
@@ -134,7 +130,7 @@ resource "aws_eks_node_group" "mynode_node" {
 
   scaling_config {
     desired_size = 1
-    max_size     = 1
+    max_size     = 2
     min_size     = 1
   }
 
