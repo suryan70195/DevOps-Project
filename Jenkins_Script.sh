@@ -12,7 +12,7 @@ if [[ -z "$VPC_ID" ]]; then
 fi
 
 # Navigate to Terraform Directory
-cd ${WORKSPACE}/DevOps_Project_3/Terraform
+cd ${WORKSPACE}/Terraform
 
 # Ensure backend.tf has the correct cluster name
 sed -i "s/mock_cluster_name/$CLUSTER_NAME/g" backend.tf
