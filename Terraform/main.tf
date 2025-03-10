@@ -20,17 +20,20 @@ locals {
   workstation_external_cidr = "${chomp(data.http.workstation-external-ip.response_body)}/32"
 }
 
-# Fetch Available Subnets Dynamically from the VPC
-data "aws_subnets" "selected" {
-  filter {
-    name   = "vpc-id"
-    values = [var.vpc_id]
-  }
+# Define Subnets Manually (Exclude us-east-1e)
+locals {
+  selected_subnets = [
+    "subnet-0f5bb343af9cdd447",  # us-east-1b 
+    "subnet-068a6fd375f265e2d",  # us-east-1a 
+    "subnet-003edcdbf20b75d6b",  # us-east-1f 
+    "subnet-0869ccf0b089dd509",  # us-east-1d 
+    "subnet-082800bf7e3e0c211"   # us-east-1c 
+  ]
 }
 
-# Output the Selected Subnet IDs
+# Output Selected Subnets
 output "subnet_ids" {
-  value = length(data.aws_subnets.selected.ids) > 0 ? data.aws_subnets.selected.ids : ["No subnets found!"]
+  value = local.selected_subnets
 }
 
 # Security Group for EKS Cluster
@@ -64,20 +67,16 @@ resource "aws_security_group" "eks_sg" {
 resource "aws_iam_role" "eks_cluster_role" {
   name = "${var.cluster_name}-eks-cluster-role"
 
-  assume_role_policy = <<POLICY
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Effect": "Allow",
-      "Principal": {
-        "Service": "eks.amazonaws.com"
-      },
-      "Action": "sts:AssumeRole"
-    }
-  ]
-}
-POLICY
+  assume_role_policy = jsonencode({
+    Statement = [{
+      Action = "sts:AssumeRole"
+      Effect = "Allow"
+      Principal = {
+        Service = "eks.amazonaws.com"
+      }
+    }]
+    Version = "2012-10-17"
+  })
 }
 
 resource "aws_iam_role_policy_attachment" "eks_cluster_role_policy" {
@@ -85,20 +84,14 @@ resource "aws_iam_role_policy_attachment" "eks_cluster_role_policy" {
   role       = aws_iam_role.eks_cluster_role.name
 }
 
-# EKS Cluster Definition (Excluding Subnets in `us-east-1e`)
+# EKS Cluster Definition
 resource "aws_eks_cluster" "myeks" {
   name     = var.cluster_name
   role_arn = aws_iam_role.eks_cluster_role.arn
   version  = "1.27"
 
   vpc_config {
-    subnet_ids = [
-      "subnet-0f5bb343af9cdd447",  # us-east-1b 
-      "subnet-068a6fd375f265e2d",  # us-east-1a 
-      "subnet-003edcdbf20b75d6b",  # us-east-1f 
-      "subnet-0869ccf0b089dd509",  # us-east-1d 
-      "subnet-082800bf7e3e0c211"   # us-east-1c 
-    ]
+    subnet_ids              = local.selected_subnets
     endpoint_private_access = false
     endpoint_public_access  = true
     security_group_ids      = [aws_security_group.eks_sg.id]
@@ -109,20 +102,16 @@ resource "aws_eks_cluster" "myeks" {
 resource "aws_iam_role" "eks_node_role" {
   name = "${var.cluster_name}-eks-node-role"
 
-  assume_role_policy = <<POLICY
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Effect": "Allow",
-      "Principal": {
-        "Service": "ec2.amazonaws.com"
-      },
-      "Action": "sts:AssumeRole"
-    }
-  ]
-}
-POLICY
+  assume_role_policy = jsonencode({
+    Statement = [{
+      Action = "sts:AssumeRole"
+      Effect = "Allow"
+      Principal = {
+        Service = "ec2.amazonaws.com"
+      }
+    }]
+    Version = "2012-10-17"
+  })
 }
 
 resource "aws_iam_role_policy_attachment" "eks_node_role_policy" {
@@ -130,28 +119,11 @@ resource "aws_iam_role_policy_attachment" "eks_node_role_policy" {
   role       = aws_iam_role.eks_node_role.name
 }
 
-resource "aws_iam_role_policy_attachment" "eks_node_cni_policy" {
-  policy_arn = "arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy"
-  role       = aws_iam_role.eks_node_role.name
-}
-
-resource "aws_iam_role_policy_attachment" "eks_node_ecr_policy" {
-  policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
-  role       = aws_iam_role.eks_node_role.name
-}
-
-# EKS Node Group (Using only Supported Subnets)
 resource "aws_eks_node_group" "eks_nodes" {
   cluster_name    = aws_eks_cluster.myeks.name
   node_group_name = "${var.cluster_name}-node-group"
   node_role_arn   = aws_iam_role.eks_node_role.arn
-  subnet_ids = [
-      "subnet-0f5bb343af9cdd447",  # us-east-1b 
-      "subnet-068a6fd375f265e2d",  # us-east-1a 
-      "subnet-003edcdbf20b75d6b",  # us-east-1f 
-      "subnet-0869ccf0b089dd509",  # us-east-1d 
-      "subnet-082800bf7e3e0c211"   # us-east-1c 
-  ]
+  subnet_ids      = local.selected_subnets
 
   scaling_config {
     desired_size = 1
