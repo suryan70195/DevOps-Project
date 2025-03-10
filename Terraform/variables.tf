@@ -1,18 +1,12 @@
 variable "region" {
-  description = "AWS region where the infrastructure will be deployed"
-  type        = string
+  type    = string
+  default = "us-east-1"
 }
 
 variable "vpc_id" {
-  description = "VPC ID where the EKS cluster will be created"
-  type        = string
+  type = string
 }
 
 variable "cluster_name" {
-  description = "Name of the EKS cluster"
-  type        = string
-}
-
-variable "node_instance_type" {
-  default = "t3.medium"  # Ensure it's a compatible instance
+  type = string
 }
