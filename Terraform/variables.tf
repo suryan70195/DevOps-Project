@@ -8,5 +8,6 @@ variable "vpc_id" {
 }
 
 variable "cluster_name" {
-  type = string
+  type    = string
+  default = "eks-cluster-dev"
 }
