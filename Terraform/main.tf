@@ -1,11 +1,15 @@
+terraform {
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 5.0"
+    }
+  }
+}
+
 provider "aws" {
   region = var.region
 }
-
-# Define Variables
-variable "region" {}
-variable "vpc_id" {}
-variable "cluster_name" {}
 
 # Fetch External IP of Workstation
 data "http" "workstation-external-ip" {
@@ -13,7 +17,7 @@ data "http" "workstation-external-ip" {
 }
 
 locals {
-  workstation-external-cidr = "${chomp(data.http.workstation-external-ip.response_body)}/32"
+  workstation_external_cidr = "${chomp(data.http.workstation-external-ip.response_body)}/32"
 }
 
 # Fetch Available Subnets Dynamically from the VPC
@@ -30,25 +34,25 @@ output "subnet_ids" {
 }
 
 # Security Group for EKS Cluster
-resource "aws_security_group" "EKS_SG" {
+resource "aws_security_group" "eks_sg" {
   name        = "${var.cluster_name}-sg"
   description = "Security group for ${var.cluster_name} EKS cluster"
   vpc_id      = var.vpc_id
 
   ingress {
-    description      = "Allow inbound traffic from workstation"
-    from_port        = 0
-    to_port          = 0
-    protocol         = "-1"
-    cidr_blocks      = [local.workstation-external-cidr]
+    description = "Allow inbound traffic from workstation"
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = [local.workstation_external_cidr]
   }
 
   egress {
-    description      = "Allow all outbound traffic"
-    from_port        = 0
-    to_port          = 0
-    protocol         = "-1"
-    cidr_blocks      = ["0.0.0.0/0"]
+    description = "Allow all outbound traffic"
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
   }
 
   tags = {
@@ -57,7 +61,7 @@ resource "aws_security_group" "EKS_SG" {
 }
 
 # IAM Role for EKS Cluster
-resource "aws_iam_role" "cluster_role" {
+resource "aws_iam_role" "eks_cluster_role" {
   name = "${var.cluster_name}-eks-cluster-role"
 
   assume_role_policy = <<POLICY
@@ -76,15 +80,15 @@ resource "aws_iam_role" "cluster_role" {
 POLICY
 }
 
-resource "aws_iam_role_policy_attachment" "AmazonEKSClusterPolicy" {
+resource "aws_iam_role_policy_attachment" "eks_cluster_role_policy" {
   policy_arn = "arn:aws:iam::aws:policy/AmazonEKSClusterPolicy"
-  role       = aws_iam_role.cluster_role.name
+  role       = aws_iam_role.eks_cluster_role.name
 }
 
 # EKS Cluster Definition (Excluding Subnets in `us-east-1e`)
 resource "aws_eks_cluster" "myeks" {
   name     = var.cluster_name
-  role_arn = aws_iam_role.cluster_role.arn
+  role_arn = aws_iam_role.eks_cluster_role.arn
   version  = "1.27"
 
   vpc_config {
@@ -97,7 +101,7 @@ resource "aws_eks_cluster" "myeks" {
     ]
     endpoint_private_access = false
     endpoint_public_access  = true
-    security_group_ids      = [aws_security_group.EKS_SG.id]
+    security_group_ids      = [aws_security_group.eks_sg.id]
   }
 }
 
@@ -121,23 +125,23 @@ resource "aws_iam_role" "eks_node_role" {
 POLICY
 }
 
-resource "aws_iam_role_policy_attachment" "eks_node_role-AmazonEKSWorkerNodePolicy" {
+resource "aws_iam_role_policy_attachment" "eks_node_role_policy" {
   policy_arn = "arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy"
   role       = aws_iam_role.eks_node_role.name
 }
 
-resource "aws_iam_role_policy_attachment" "eks_node_role-AmazonEKS_CNI_Policy" {
+resource "aws_iam_role_policy_attachment" "eks_node_cni_policy" {
   policy_arn = "arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy"
   role       = aws_iam_role.eks_node_role.name
 }
 
-resource "aws_iam_role_policy_attachment" "eks_node_role-AmazonEC2ContainerRegistryReadOnly" {
+resource "aws_iam_role_policy_attachment" "eks_node_ecr_policy" {
   policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
   role       = aws_iam_role.eks_node_role.name
 }
 
 # EKS Node Group (Using only Supported Subnets)
-resource "aws_eks_node_group" "mynode_node" {
+resource "aws_eks_node_group" "eks_nodes" {
   cluster_name    = aws_eks_cluster.myeks.name
   node_group_name = "${var.cluster_name}-node-group"
   node_role_arn   = aws_iam_role.eks_node_role.arn
